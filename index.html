@@ -9,7 +9,7 @@
 :root{--bg:#071426;--panel:#10243b;--line:#31516c;--text:#e8f4ff;--muted:#9eb8ce;--gold:#ffd166}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,sans-serif;overflow:hidden;touch-action:none}
 body{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 20%,#173a5b,#071426 70%)}
-#shell{width:min(100vw,900px);height:100dvh;max-height:760px;display:flex;flex-direction:column;gap:8px;padding:10px}
+#shell{width:100vw;height:100dvh;max-height:none;display:flex;flex-direction:column;gap:8px;padding:10px}
 header{display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:.12em;font-size:clamp(14px,2.5vw,19px)}
 header small{font-size:11px;color:var(--muted);letter-spacing:.08em}
 #gameWrap{position:relative;flex:1;min-height:0;border:2px solid #31516c;border-radius:12px;overflow:hidden;background:#08192b;box-shadow:0 14px 50px #0008}
@@ -85,7 +85,24 @@ if ('serviceWorker' in navigator) {
 (()=>{
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 ctx.imageSmoothingEnabled=false;
-const W=480,H=640;
+let W=480,H=640;
+const BASE_H=640;
+function resizeGame(){
+ const rect=canvas.getBoundingClientRect();
+ if(!rect.width||!rect.height)return;
+ const oldW=W;
+ H=BASE_H;
+ W=H*(rect.width/rect.height);
+ const dpr=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.round(rect.width*dpr);
+ canvas.height=Math.round(rect.height*dpr);
+ ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0);
+ ctx.imageSmoothingEnabled=false;
+ if(player){
+  player.x=Math.max(18,Math.min(W-18,(player.x/oldW)*W));
+  player.y=Math.max(18,Math.min(H-18,player.y));
+ }
+}
 const jets=[
  {name:'F-16',label:'Agile multirole',color:'#62d5e8',speed:3.8,rate:12},
  {name:'F/A-18',label:'Balanced carrier jet',color:'#b9c7d5',speed:3.35,rate:10},
@@ -93,6 +110,8 @@ const jets=[
  {name:'Eurofighter',label:'Advanced all-rounder',color:'#a7d78a',speed:3.6,rate:9}
 ];
 let chosen=0,env='blue',state='menu',keys={},joy={x:0,y:0},player,shots=[],missiles=[],foes=[],enemyShots=[],sparks=[],score=0,frame=0,wave=1,boss=null,bossTimer=0,spawnTimer=0,invuln=0,best=0;
+resizeGame();
+window.addEventListener('resize',resizeGame);
 try{best=Number(localStorage.getItem('skyAceBest')||0)}catch(e){}
 const $=id=>document.getElementById(id);
 const choices=$('jetChoices');
@@ -285,6 +304,17 @@ requestAnimationFrame(loop);
 window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Space'].includes(e.key))e.preventDefault();keys[e.key===' '?'Space':e.key]=true;if(e.key==='Escape'&&state==='play'){state='paused';$('endTitle').textContent='PAUSED';$('endText').textContent='Take a breather. Resume when ready.';$('finalScore').textContent=score;$('bestScore').textContent=best;$('menu').classList.add('hidden');$('end').classList.remove('hidden');$('overlay').classList.remove('hidden');$('again').textContent='RESUME';$('again').onclick=()=>{state='play';$('overlay').classList.add('hidden');$('again').textContent='FLY AGAIN';$('again').onclick=start}}});
 window.addEventListener('keyup',e=>{keys[e.key===' '?'Space':e.key]=false});
 const stick=$('joystick'),knob=$('joyKnob');let stickPointer=null;
+function resetControls(){
+ keys={};
+ joy={x:0,y:0};
+ if(stickPointer!==null){
+  try{stick.releasePointerCapture(stickPointer)}catch(e){}
+  stickPointer=null;
+ }
+ knob.style.transform='translate(0px,0px)';
+}
+window.addEventListener('blur',resetControls);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)resetControls()});
 function setStick(e){
  const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
  let x=(e.clientX-cx)/(r.width*.36),y=(e.clientY-cy)/(r.height*.36);
@@ -295,10 +325,12 @@ function releaseStick(e){if(stickPointer===e.pointerId){stickPointer=null;joy={x
 stick.addEventListener('pointerdown',e=>{e.preventDefault();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);setStick(e)});
 stick.addEventListener('pointermove',e=>{if(stickPointer===e.pointerId){e.preventDefault();setStick(e)}});
 stick.addEventListener('pointerup',releaseStick);stick.addEventListener('pointercancel',releaseStick);
+stick.addEventListener('lostpointercapture',releaseStick);
 const fireButton=document.querySelector('.fire');
 fireButton.addEventListener('pointerdown',e=>{e.preventDefault();keys.Space=true;fireButton.setPointerCapture(e.pointerId)});
 fireButton.addEventListener('pointerup',e=>{e.preventDefault();keys.Space=false});
 fireButton.addEventListener('pointercancel',()=>keys.Space=false);
+fireButton.addEventListener('lostpointercapture',()=>keys.Space=false);
 const missileButton=$('missileButton');
 missileButton.addEventListener('pointerdown',e=>{e.preventDefault();launchMissile();missileButton.setPointerCapture(e.pointerId)});
 })();
