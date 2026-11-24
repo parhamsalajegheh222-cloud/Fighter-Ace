@@ -249,7 +249,39 @@ function draw(){
  if(player&&(state==='play')){if(invuln===0||Math.floor(frame/5)%2===0)drawJet(player.x,player.y,jets[chosen].color,false,1.05,player.angle);}
  ctx.fillStyle='#ffffffaa';ctx.font='10px monospace';ctx.textAlign='left';ctx.fillText('WAVE '+wave,12,H-12);
 }
-function loop(){if(state==='play')update();draw();requestAnimationFrame(loop)}loop();
+
+const STEP = 1000 / 30;
+let lastTime = 0;
+let accumulator = 0;
+
+function loop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+
+  const elapsed = Math.min(timestamp - lastTime, 100);
+  lastTime = timestamp;
+
+  if (state === 'play') {
+    accumulator += elapsed;
+
+    while (accumulator >= STEP) {
+      update();
+      accumulator -= STEP;
+
+      if (state !== 'play') {
+        accumulator = 0;
+        break;
+      }
+    }
+  } else {
+    accumulator = 0;
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+  ;
 window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Space'].includes(e.key))e.preventDefault();keys[e.key===' '?'Space':e.key]=true;if(e.key==='Escape'&&state==='play'){state='paused';$('endTitle').textContent='PAUSED';$('endText').textContent='Take a breather. Resume when ready.';$('finalScore').textContent=score;$('bestScore').textContent=best;$('menu').classList.add('hidden');$('end').classList.remove('hidden');$('overlay').classList.remove('hidden');$('again').textContent='RESUME';$('again').onclick=()=>{state='play';$('overlay').classList.add('hidden');$('again').textContent='FLY AGAIN';$('again').onclick=start}}});
 window.addEventListener('keyup',e=>{keys[e.key===' '?'Space':e.key]=false});
 const stick=$('joystick'),knob=$('joyKnob');let stickPointer=null;
